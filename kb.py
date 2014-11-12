@@ -132,7 +132,10 @@ class KB:
         self._registered_callbacks = Queue()
         self._callbackexecutor = EventCallbackExecutor(self._internal_events, self.events, self._registered_callbacks)
         self._callbackexecutor.start()
-
+        
+        self.use_models = None 
+        
+        
 
     def add_method(self, m):
         m = str(m) # convert from unicode...
@@ -175,6 +178,15 @@ class KB:
             self._asyncore_thread.join()
         else:
             self._client.close()
+            
+    def active_models(self,models): 
+        """ Set the active models, and return object ModelSetter to close the active models     
+        """
+        
+        self.use_models = models
+        
+        return ModelSetter(self)
+        
 
     def subscribe(self, pattern, callback = None, var = None, type = 'NEW_INSTANCE', trigger = 'ON_TRUE', models = None):
         """ Allows to subscribe to an event, and get notified when the event is 
@@ -322,7 +334,7 @@ class KB:
         in the ontology.
         
         This allows syntax like:
-
+        
         .. code:: python
 
             if 'Toto' in kb:
@@ -334,9 +346,14 @@ class KB:
         toks = shlex.split(pattern)
         if len(toks) == 3:
             pattern = self._replacestar(toks)
-            return self.exist(["%s %s %s" % pattern])
+            return self.exist(["%s %s %s" % pattern],self.use_models) 
         else:
-            return True if self.lookup(pattern) else False
+            return True if self.lookup(pattern,self.use_models) else False 
+        
+        
+        
+        
+        
     
     def __iadd__(self, stmts):
         """ This method allows to easily add new statements to the ontology
@@ -351,10 +368,10 @@ class KB:
             kb += ["toto loves tata", "tata rdf:type Robot"]
 
         """
-        if not (type(stmts) == list):
-            stmts = [stmts]
+        #if not (type(stmts) == list):
+            #stmts = [stmts]
         
-        self.update(stmts)
+        self.update(stmts,self.use_models)
         
         return self
 
@@ -585,6 +602,15 @@ class RemoteKBClient(asynchat.async_chat):
             # we tried to send some actual data
             return
 
+class ModelSetter:
+    def __init__(self, kb):
+        self.kb = kb
+    
+    def __enter__(self):
+        pass
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.kb.models = []
+
 
 if __name__ == '__main__':
 
@@ -596,11 +622,10 @@ if __name__ == '__main__':
     formatter = logging.Formatter('%(asctime)-15s: %(message)s')
     console.setFormatter(formatter)
     kblogger.addHandler(console)
-
-
+    
     kb = KB()
-
 
     time.sleep(.1)
     print("Closing now...")
     kb.close()
+
