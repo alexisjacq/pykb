@@ -32,25 +32,37 @@ class TestSequenceFunctions(unittest.TestCase):
 
     def test_existence(self):
 
+	self.kb += "toto likes wine"
+	self.assertTrue(self.kb.exist(["toto likes wine"]))
+	self.assertTrue(self.kb["toto likes wine"])
+
 
         with self.kb.active_models(['alexis','robot']):
             self.kb += ["glass_2 rdf:type Glass","glass_2 isOn desktop"]
         with self.kb.active_models(['robot']):
             self.kb += ["glass_1 rdf:type Glass","glass_1 isOn desktop"]
+            
+	self.assertTrue(self.kb.__getitem__("glass_1 isOn desktop","glass_1 rdf:type Glass", ['robot']))
+	self.assertFalse(self.kb["glass_1 isOn desktop"])
+
+
+        with self.kb.active_models(['alexis','robot']):
+            self.assertTrue( "glass_2" in self.kb)
+            self.assertTrue( "glass_1" in self.kb)
+	    self.assertFalse(self.kb["toto likes wine"]) 
+	    self.assertTrue(self.kb.__getitem__("toto likes wine", ["default"]))
+
+
+        with self.kb.active_models(['robot']):
+            self.assertTrue( "glass_1" in self.kb)
+            self.kb -= ["glass_1 isOn desktop", "glass_1 rdf:type Glass"]
+            self.assertFalse( "glass_1" in self.kb)
+
 
         with self.kb.active_models(['alexis']):
             self.assertTrue( "glass_2" in self.kb)
             self.assertFalse( "glass_1" in self.kb)
-
-        with self.kb.active_models(['robot']):
-            self.assertTrue( "glass_1" in self.kb)
-            self.assertTrue( "glass_1" in self.kb)
-        
-        with self.kb.active_models(['alexis','robot']):
-            self.assertTrue( "glass_2" in self.kb)
-            self.assertTrue( "glass_1" in self.kb)
             
-
 
 def version():
     print("minimalKB tests %s" % __version__)

@@ -24,6 +24,7 @@ except ImportError: #Python3 compat
 
 EVENT_POLLING_RATE = 20 #Hz
 DEFAULT_PORT = 6969
+DEFAULT_MODEL = "default"
 
 class NullHandler(logging.Handler):
     """Defines a NullHandler for logging, in case kb is used in an application
@@ -133,7 +134,7 @@ class KB:
         self._callbackexecutor = EventCallbackExecutor(self._internal_events, self.events, self._registered_callbacks)
         self._callbackexecutor.start()
         
-        self.use_models = None 
+        self._active_models = DEFAULT_MODEL 
         
         
 
@@ -180,12 +181,14 @@ class KB:
             self._client.close()
             
     def active_models(self,models): 
-        """ Set the active models, and return object ModelSetter to close the active models     
+        """ Set the active models, and return object ModelSetter to reset the default models when the context is leaved     
         """
+        if models:
+	    self._active_models = models
+	else:
+	    self._active_models = DEFAULT_MODEL 
         
-        self.use_models = models
-        
-        return ModelSetter(self)
+        return ModelContext(self)
         
 
     def subscribe(self, pattern, callback = None, var = None, type = 'NEW_INSTANCE', trigger = 'ON_TRUE', models = None):
@@ -295,14 +298,15 @@ class KB:
             city_id = kb["ville rose"]
 
         """
-        args = args[0]
 
         # First, take care of models
-        models = None
+        models = self._active_models 
         if len(args) > 1 and isinstance(args[-1], list):
             models = args[-1]
             args = args[:-1]
 
+
+	args = args[0]
 
         def get_vars(s):
             return [v for v in s if v.startswith('?')]
@@ -346,9 +350,9 @@ class KB:
         toks = shlex.split(pattern)
         if len(toks) == 3:
             pattern = self._replacestar(toks)
-            return self.exist(["%s %s %s" % pattern],self.use_models) 
+            return self.exist(["%s %s %s" % pattern], self._active_models) 
         else:
-            return True if self.lookup(pattern,self.use_models) else False 
+            return True if self.lookup(pattern, self._active_models) else False   #  ajouter possibilité de demander existance a la fois dans tout les models demandés
         
         
         
@@ -368,10 +372,10 @@ class KB:
             kb += ["toto loves tata", "tata rdf:type Robot"]
 
         """
-        #if not (type(stmts) == list):
-            #stmts = [stmts]
+        if not (type(stmts) == list):
+            stmts = [stmts]
         
-        self.update(stmts,self.use_models)
+        self.update(stmts, self._active_models)
         
         return self
 
@@ -392,7 +396,7 @@ class KB:
         if not (type(stmts) == list):
             stmts = [stmts]
         
-        self.retract(stmts)
+        self.retract(stmts, self._active_models)
         
         return self
 
@@ -602,14 +606,14 @@ class RemoteKBClient(asynchat.async_chat):
             # we tried to send some actual data
             return
 
-class ModelSetter:
+class ModelContext:
     def __init__(self, kb):
         self.kb = kb
     
     def __enter__(self):
         pass
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.kb.models = []
+        self.kb._active_models = DEFAULT_MODEL
 
 
 if __name__ == '__main__':
